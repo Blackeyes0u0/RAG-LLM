@@ -246,3 +246,55 @@ plt.hist(score_i,bins=40)
 ![alt text](image-4.png)
 
  multi lingual이 더 좋은 우수한 결과라고 생각된다.
+
+
+ ## PEFT LoRA 라이브러리 오류 발생
+## 직접 만들기로 결심
+
+# 1. 내가 LoRA를 적용하고 싶은 여러 모델 탐색
+
+SentenceTransformer 중 multilingual,
+
+clip,gpt2,bert를 lora를 사용해서 파인튜닝 시키고 싶었다.
+
+mistral 7B, stable-diffusion은 불러오다가 오류가 나서 잠깐 보류
+
+일단 논문에 나온대로 attention layer에다가 low rank adaptation을 하기로 생각.
+
+gpt와 오피셜 깃허브의 힘을 받아서 만들어보았다.
+12시간 넘게 걸린것 같다.
+
+https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+
+그러던 와중 수종이에게 감사하게도 v100을 빌려줘서 빠르게 만들었지만, 기본적인 코드에 대한 이해가 부족하다는 생각이 많이 든다.
+
+먼저 코드를 해설하자면 LoRA_Config를 만들어서 config값을 받고, 
+그걸로 기본 LoRALayer를 만들게 한다. 솔직히 잘몰라서 nn.Module을 상속받게 하고 만들면 어떻게든 학습되고 합쳐지지않을까했다.
+
+각 LoRALayer는 기존 layer값과 config값을 받는다.
+
+그후에는 lora_a,lora_b를 만들고 초기화 시킨다. 공식깃허브대로함.
+그리고 dropout은 작동할수도 안할수도있어서 0이상인 경우에만 작동하고 아니면
+lambda x :x로 지나가게 만들었다. 이건 공식 깃허브 보고안거임
+
+그다음에 weight값을  scaling을 해주고 기존 가중치 값과 합친다음에
+
+F.linear(x,W,bias)이렇게 만들었다. 이 구조는 직접적인 선형변환을 적용하기 위해서 추가한것이다. lowrank를 넣어주기위해 새로운 w를 구하고 그걸 다시 모델이 nn.linear로 인식해서 통과하도록 만들었다.
+
+그리고 model에 표시되게
+
+__repr__을 만들어주었다.
+
+그리고 여러 모델들에 적용할수있나 확인해보았는데 잘되었다.
+gpt2,distilbert,bert,xclip,clip,sentence-transformers/distil-multigual-encoder ....
+
+일단 gpt,bert두개는 attention 레이어가 쿼리키벨류 3개가 합쳐져있어서 내가 그걸 적용하지는 못하였다. 파티션3개로 나눠서 해야한다.
+
+다음 성능.현재까지 2000여개의 이미지와 텍스트 파일인 
+youtube thumbnail의 데이터로만 관측한 결과 
+rank값이 많아질수록 더 높은 성능을 보이고 있다. 최적화된 rank가 몇인지는 더살펴보아야할것같다.
+
+어느순간부터 더 늘려도 안되는 순간이 오지않을까?
+
+lora에 대해서 생각해보면 기존 벡터를 쿼리 키 벨류로 isomorphic하게 선형변환을 시킨다고 생각이든다. 그런데 lora는 projection시켜서 주요한 차원으로 압축시키고, 그걸 다시 원래의 차원으로 확장시킨다. 먼저 요지는 주요한 차원이 있다는것이다.
+그걸 rank로 만들수있다는것이고, 그걸 다시 적절하게 만드느것이다.

@@ -1,0 +1,25 @@
+torch==1.13.1
+torchvision==0.14.1 
+torchaudio==0.13.1
+
+datasets==2.15.0
+transformers==4.25.1
+tqdm
+pandas
+scikit-learn
+argparse
+# random
+ipywidgets
+huggingface_hub
+
+# faiss install (if i want to)
+faiss-gpu
+sentence-transformers
+konlpy
+rank-bm25
+sentencepiece
+
+# langchain (if i want to )
+langchain
+langchain-community
+sentence-transformers
